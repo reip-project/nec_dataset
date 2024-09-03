@@ -18,6 +18,19 @@ DEFAULT_BITRATE = 10000  # kbps
 
 
 def browse_sessions(sessions):
+    """
+    Iterates over a sorted list of session directories and logs processing times.
+
+    Parameters:
+    -----------
+    sessions : list of str
+        List of session directory paths to process.
+
+    Yields:
+    -------
+    str
+        The current session path being processed.
+    """
     sessions = sorted(sessions)
     t0 = time.time()
 
@@ -35,6 +48,24 @@ def browse_sessions(sessions):
 
 
 def find_video_segments(path, save=True, verbose=True):
+    """
+    Finds and organizes video segments in a specified directory.
+
+    Parameters:
+    -----------
+    path : str
+        The directory path to search for video segments.
+    save : bool, optional
+        If True, saves the segment information to a JSON file (default is True).
+    verbose : bool, optional
+        If True, prints detailed information about the segments (default is True).
+
+    Returns:
+    --------
+    list of dict
+        A list containing dictionaries with details about each video segment, including 
+        patterns, prefixes, and statuses (good, skipped, lost).
+    """
     files = sorted(glob.glob(path + "*_*_0.avi"))
     if verbose:
         print("\n%d segments in" % len(files), path)
@@ -75,6 +106,38 @@ def find_video_segments(path, save=True, verbose=True):
 
 def merge_single_video(pattern, filename, width=W, height=H, fps=FPS, divider=1,
                        bitrate=DEFAULT_BITRATE, variable=True, codec="h265", gpu=0, overwrite=True):
+    """
+    Merges multiple video chunks into a single encoded video file.
+
+    Parameters:
+    -----------
+    pattern : str
+        The file pattern for input video chunks (e.g., 'video_%d.avi').
+    filename : str
+        The output filename for the merged video.
+    width : int, optional
+        Width of the video frames (default is W).
+    height : int, optional
+        Height of the video frames (default is H).
+    fps : int, optional
+        Frames per second for the output video (default is FPS).
+    divider : int, optional
+        Factor to downscale video frames (default is 1, no downscaling).
+    bitrate : int, optional
+        Bitrate for the output video in kbps (default is DEFAULT_BITRATE).
+    variable : bool, optional
+        If True, use variable bitrate encoding; otherwise, constant bitrate (default is True).
+    codec : str, optional
+        Codec to use for encoding ('h264' or 'h265', default is 'h265').
+    gpu : int, optional
+        GPU index to use for encoding (default is 0).
+    overwrite : bool, optional
+        If True, overwrite existing files (default is True).
+
+    Returns:
+    --------
+    None
+    """
     print("\nBitrate", bitrate, "kbps with", codec, "codec for", filename)
     if os.path.exists(filename) and not overwrite:
         print(filename, "already exists. Skipping...")
@@ -104,6 +167,39 @@ def merge_single_video(pattern, filename, width=W, height=H, fps=FPS, divider=1,
 def merge_single_video_fast(pattern, filename, width=W, height=H, fps=FPS, divider=1,
                             bitrate=DEFAULT_BITRATE, variable=True, codec="h265", gpu=0, overwrite=True,
                             verbose=False, save_log=None):
+    """
+    Quickly merges and encodes video chunks into a single file using GStreamer and GPU acceleration.
+
+    Parameters:
+    -----------
+    pattern : str
+        The file pattern for input video chunks (e.g., 'video_%d.avi').
+    filename : str
+        The output filename for the merged video.
+    width : int, optional
+        Width of the video frames (default is W).
+    height : int, optional
+        Height of the video frames (default is H).
+    fps : int, optional
+        Frames per second for the output video (default is FPS).
+    divider : int, optional
+        Factor to downscale video frames (default is 1, no downscaling).
+    bitrate : int, optional
+        Bitrate for the output video in kbps (default is DEFAULT_BITRATE).
+    variable : bool, optional
+        If True, use variable bitrate encoding; otherwise, constant bitrate (default is True).
+    codec : str, optional
+        Codec to use for encoding ('h264' or 'h265', default is 'h265').
+    gpu : int, optional
+        GPU index to use for encoding (default is 0).
+    overwrite : bool, optional
+        If True, overwrite existing files (default is True).
+    verbose : bool, optional
+        If True, enables verbose GStreamer logging (default is False).
+    save_log : bool or str, optional
+        If True, saves the GStreamer log to a file; if str, saves to the specified filename (default is None).
+
+    """
     print("\nBitrate", bitrate, "kbps with", codec, "codec for", filename)
     if os.path.exists(filename) and not overwrite:
         print(filename, "already exists. Skipping...")
@@ -144,6 +240,20 @@ def merge_single_video_fast(pattern, filename, width=W, height=H, fps=FPS, divid
 
 
 def count_frames(source):
+    """
+    Counts the number of frames in a video file or stream.
+
+    Parameters:
+    -----------
+    source : str or cv2.VideoCapture
+        The path to the video file or an already opened cv2.VideoCapture object.
+
+    Returns:
+    --------
+    int
+        The total number of frames in the video.
+    """
+
     if type(source) is str:
         reader = cv2.VideoCapture(source)
     else:
@@ -159,6 +269,35 @@ def count_frames(source):
 
 
 def diff(filename, max_frames, bitrate, codec, width=W, height=H, fps=FPS, debug=False):
+    """
+    Compares frames between an original video and its re-encoded version to assess encoding quality.
+
+    Parameters:
+    -----------
+    filename : str
+        The path to the original video file.
+    max_frames : int
+        The maximum number of frames to compare.
+    bitrate : int
+        The bitrate used for the encoded video.
+    codec : str
+        The codec used for the encoded video ('h264' or 'h265').
+    width : int, optional
+        Width of the video frames (default is W).
+    height : int, optional
+        Height of the video frames (default is H).
+    fps : int, optional
+        Frames per second for the videos (default is FPS).
+    debug : bool, optional
+        If True, displays visual differences between frames using matplotlib (default is False).
+
+    Returns:
+    --------
+    list of dict
+        A list of dictionaries, each containing:
+        - 'avgs': [average absolute difference, average relative difference]
+        - 'hist': Histogram of the pixel differences.
+    """
     gstream = "filesrc location=%s ! image/jpeg,width=%d,height=%d,framerate=%d/1 ! jpegdec ! " \
               "videoconvert ! video/x-raw, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! queue ! " \
               "appsink" % (filename, width, height, fps)
